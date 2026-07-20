@@ -2,42 +2,73 @@
 
 A **zero-cost, privacy-respecting** people counter that estimates room occupancy by passively sniffing Wi-Fi probe requests. No cameras, no beacons, no cloud — just a $3 ESP32 board and radio physics.
 
-> **v3.0** — Modular architecture, serial CLI, OUI vendor lookup, CSV logging, rolling averages, and more.
+> **v3.0** — ESP-IDF CMake build, pure C, modular architecture, serial CLI, OUI vendor lookup, CSV logging.
 
 ---
 
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [How It Works](#how-it-works)
-3. [Hardware](#hardware)
-4. [Software Setup](#software-setup)
+2. [Prerequisites](#prerequisites)
+3. [How It Works](#how-it-works)
+4. [Hardware](#hardware)
 5. [Project Structure](#project-structure)
-6. [Serial CLI Reference](#serial-cli-reference)
-7. [Configuration Reference](#configuration-reference)
-8. [Serial Output Formats](#serial-output-formats)
-9. [OUI Vendor Lookup](#oui-vendor-lookup)
-10. [CSV Data Logging](#csv-data-logging)
+6. [Building & Flashing](#building--flashing)
+7. [Serial CLI Reference](#serial-cli-reference)
+8. [Configuration Reference](#configuration-reference)
+9. [Serial Output Formats](#serial-output-formats)
+10. [OUI Vendor Lookup](#oui-vendor-lookup)
 11. [802.11 Header Parsing](#80211-header-parsing)
 12. [Architecture & Data Flow](#architecture--data-flow)
-13. [Optimisation Notes](#optimisation-notes)
-14. [Tuning Guide](#tuning-guide)
-15. [Troubleshooting](#troubleshooting)
-16. [Privacy & Ethics](#privacy--ethics)
-17. [Limitations](#limitations)
-18. [License](#license)
+13. [Tuning Guide](#tuning-guide)
+14. [Troubleshooting](#troubleshooting)
+15. [Privacy & Ethics](#privacy--ethics)
+16. [License](#license)
 
 ---
 
 ## Quick Start
 
+```bash
+# Clone the repo
+git clone https://github.com/stalss/passive-wifi-crowd-counter.git
+cd passive-wifi-crowd-counter
+
+# Set up ESP-IDF environment (see Prerequisites)
+. $IDF_PATH/export.sh
+
+# Build, flash, and monitor
+idf.py build
+idf.py -p /dev/ttyUSB0 flash monitor
 ```
-1.  Install Arduino IDE + ESP32 board support (see Software Setup)
-2.  Open passive-wifi-crowd-counter.ino
-3.  Upload to your ESP32
-4.  Open Serial Monitor @ 115200 baud
-5.  Type 'help' for available commands
-```
+
+Type `help` in the monitor for a list of commands.
+
+---
+
+## Prerequisites
+
+### ESP-IDF v5.1+
+
+This project uses the **ESP-IDF** build system (CMake). It does **not** use the Arduino framework.
+
+1. **Install ESP-IDF v5.1+** following the official guide:
+   https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/
+
+2. **Set up the environment** in every new terminal:
+   ```bash
+   . $IDF_PATH/export.sh
+   ```
+
+3. **Verify** by running:
+   ```bash
+   idf.py --version
+   # Should print v5.1 or later
+   ```
+
+### Toolchain
+
+ESP-IDF bundles its own GCC toolchain — no separate installation needed. The CMake build system handles everything automatically.
 
 ---
 
@@ -52,7 +83,7 @@ This project:
 3. Filters for **Probe Requests** (Frame Control subtype `0x04`).
 4. Extracts the **source MAC** and **RSSI** (signal strength).
 5. Tracks unique MACs in a fixed-size **hash table** with automatic expiry.
-6. Reports a smoothed **people count** over serial every 5 seconds.
+6. Reports a smoothed **people count** over UART every 5 seconds.
 7. Optionally **categorises devices** by vendor (Phone / Laptop / IoT).
 
 ### Why Probe Requests?
@@ -60,8 +91,8 @@ This project:
 | Frame Type | When Sent | Carries MAC? | Useful? |
 |---|---|---|---|
 | **Probe Request** | Constantly (Wi-Fi on) | Yes (Source) | **Best candidate** |
-| Beacon | Only from APs | AP's MAC only | No (not from phones) |
-| Data | Only when connected | Yes | No (requires association) |
+| Beacon | Only from APs | AP's MAC only | No |
+| Data | Only when connected | Yes | No |
 | Auth/Assoc | Only during connection | Yes | Too rare |
 
 ---
@@ -72,60 +103,23 @@ This project:
 
 | Component | Specification | Approx. Cost |
 |---|---|---|
-| **ESP32 DevKit** | ESP32-WROOM-32U (**external antenna**) | $3–5 |
+| **ESP32 DevKit** | ESP32-WROOM-32U (external antenna) | $3–5 |
 | USB cable | Micro-USB or USB-C | $1 |
-| Computer | For programming + serial monitor | — |
 
 ### Recommended
 
 | Component | Why |
 |---|---|
 | **External antenna** (2.4 GHz, 3 dBi) | 2–3× range vs PCB antenna |
-| **USB power bank** | Deploy standalone without a computer |
-| **3D-printed / cardboard case** | Protect the board |
+| **USB power bank** | Deploy standalone |
 
 ### ESP32-WROOM-32U vs WROOM-32
 
 | Feature | WROOM-32 | WROOM-32U |
 |---|---|---|
-| Antenna | PCB trace | U.FL connector (external) |
+| Antenna | PCB trace | U.FL connector |
 | Range (indoor) | ~10–15 m | ~20–40 m |
-| **Recommended** | Adequate for small rooms | **Yes** — better capture rate |
-
----
-
-## Software Setup
-
-### 1. Install Arduino IDE
-
-Download from [arduino.cc/en/software](https://www.arduino.cc/en/software) (v2.x recommended).
-
-### 2. Add ESP32 Board Support
-
-1. **File → Preferences** → **Additional Boards Manager URLs**:
-   ```
-   https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-   ```
-2. **Tools → Board → Boards Manager** → Search `esp32` → Install
-
-### 3. Board Settings
-
-| Setting | Value |
-|---|---|
-| Board | `ESP32 Dev Module` |
-| Upload Speed | `921600` |
-| Flash Frequency | `80 MHz` |
-| Flash Mode | `QIO` |
-| Flash Size | `4 MB (32 Mb)` |
-| Partition Scheme | `Default 4MB with spiffs` |
-| CPU Frequency | `240 MHz (WiFi)` |
-
-### 4. Libraries
-
-No external libraries needed. Uses only built-in ESP32 Arduino core libraries:
-- `<Arduino.h>` — core API
-- `<WiFi.h>` — WiFi driver
-- `<esp_wifi.h>` — low-level promiscuous mode API
+| **Recommended** | Adequate | **Yes** |
 
 ---
 
@@ -133,66 +127,134 @@ No external libraries needed. Uses only built-in ESP32 Arduino core libraries:
 
 ```
 passive-wifi-crowd-counter/
-├── passive-wifi-crowd-counter.ino   # Main entry point (setup + loop)
-├── config.h                          # All user-configurable constants
-├── types.h                           # Shared data structures
-├── hash_table.h / .cpp               # MAC deduplication (ISR-safe)
-├── sniffer.h / .cpp                  # 802.11 packet parsing callback
-├── channel_manager.h / .cpp          # Non-blocking channel hopper
-├── stats.h / .cpp                    # Rolling average & peak tracker
-├── serial_cli.h / .cpp               # Interactive serial commands
-├── reporter.h / .cpp                 # Formatted serial output
-├── oui_lookup.h / .cpp               # MAC vendor prefix matching
-├── README.md                         # This file
-└── LICENSE                           # MIT License
+├── CMakeLists.txt              # Top-level ESP-IDF CMake
+├── main/
+│   ├── CMakeLists.txt          # Component CMake (sources + deps)
+│   ├── app_main.c              # Entry point + FreeRTOS tasks
+│   ├── config.h                # All user-configurable constants
+│   ├── types.h                 # Shared data structures
+│   ├── hash_table.h / .c       # MAC deduplication (ISR-safe)
+│   ├── sniffer.h / .c          # 802.11 packet parsing callback
+│   ├── channel_manager.h / .c  # Non-blocking channel hopper
+│   ├── stats.h / .c            # Rolling average & peak tracker
+│   ├── serial_cli.h / .c       # Interactive CLI (esp_console)
+│   ├── reporter.h / .c         # Formatted serial output
+│   └── oui_lookup.h / .c       # MAC vendor prefix matching
+├── README.md
+└── LICENSE
 ```
 
 ### Module Responsibilities
 
-| Module | Responsibility | ISR-safe? |
+| Module | Responsibility | Runs in |
 |---|---|---|
 | `config.h` | All `#define` constants | — |
 | `types.h` | `DeviceSlot`, `CrowdStats` structs | — |
-| `hash_table` | Open-addressing hash table for MAC dedup | **Yes** |
-| `sniffer` | Packet parsing callback, RSSI filtering | **Yes** (ISR) |
-| `channel_manager` | Non-blocking WiFi channel rotation | No |
-| `stats` | Rolling average, peak tracking | No |
-| `serial_cli` | Interactive command parser | No |
-| `reporter` | Human-readable + CSV serial output | No |
-| `oui_lookup` | MAC prefix → vendor name/category | No |
+| `hash_table` | Open-addressing hash table | ISR + tasks |
+| `sniffer` | Packet parsing callback | **ISR** |
+| `channel_manager` | WiFi channel rotation | Task |
+| `stats` | Rolling average, peak tracking | Task |
+| `serial_cli` | `esp_console` REPL + 15 commands | Task |
+| `reporter` | Human-readable + CSV output | Task |
+| `oui_lookup` | MAC prefix → vendor/category | Task |
+
+---
+
+## Building & Flashing
+
+### First-Time Setup
+
+```bash
+# 1. Install ESP-IDF (if not done)
+mkdir -p ~/esp
+cd ~/esp
+git clone -b v5.1.2 --recursive https://github.com/espressif/esp-idf.git
+cd esp-idf
+./install.sh esp32
+. ./export.sh
+
+# 2. Clone this project
+git clone https://github.com/stalss/passive-wifi-crowd-counter.git
+cd passive-wifi-crowd-counter
+```
+
+### Build
+
+```bash
+idf.py build
+```
+
+### Flash & Monitor
+
+```bash
+# Replace /dev/ttyUSB0 with your port
+idf.py -p /dev/ttyUSB0 flash monitor
+```
+
+### Build Only (no flash)
+
+```bash
+idf.py build
+```
+
+### Clean Build
+
+```bash
+idf.py fullclean
+idf.py build
+```
+
+### Set Target (if needed)
+
+```bash
+idf.py set-target esp32
+idf.py build
+```
+
+### Monitor Only (after flash)
+
+```bash
+idf.py -p /dev/ttyUSB0 monitor
+```
+
+### Exit Monitor
+
+Press `Ctrl+]` to exit the IDF monitor.
 
 ---
 
 ## Serial CLI Reference
 
-Type commands into the Serial Monitor at runtime. No reboot required.
+The CLI uses ESP-IDF's `esp_console` with a full REPL — line editing, tab completion, and command history are built in.
+
+Type `help` for the full list:
 
 ```
-crowd> help
-```
+ESP32> help
 
-| Command | Description |
-|---|---|
-| `help` | Show all available commands |
-| `count` | Print current crowd count |
-| `peak` | Print peak count since boot |
-| `avg` | Print rolling average |
-| `status` | Full status dashboard (count, RSSI, channel, uptime, memory) |
-| `channels` | Per-channel hit distribution with bar chart |
-| `vendors` | Device vendor breakdown (Phone / Laptop / IoT / Unknown) |
-| `rssi [value]` | Get or set RSSI threshold at runtime |
-| `expiry [seconds]` | Get or set MAC expiry timeout |
-| `dump` | List all tracked MACs with RSSI, age, and vendor |
-| `reset` | Clear all tracked devices and statistics |
-| `csv` | Toggle CSV output mode (for data logging) |
-| `pause` | Pause scanning (stops counting) |
-| `resume` | Resume scanning |
-| `led` | Toggle LED heartbeat on/off |
+  Available commands:
+  ─────────────────────────────────────
+  help               Show this message
+  count              Current crowd count
+  peak               Peak count since boot
+  avg                Rolling average
+  status             Full status report
+  channels           Per-channel hit counts
+  vendors            Device vendor breakdown
+  rssi [value]       Get/set RSSI threshold
+  expiry [seconds]   Get/set MAC expiry
+  dump               List all tracked MACs
+  reset              Clear all devices
+  csv                Toggle CSV output
+  pause              Pause scanning
+  resume             Resume scanning
+  led                Toggle LED heartbeat
+```
 
 ### Example Session
 
 ```
-crowd> status
+ESP32> status
 
   ┌──────────────────────────────────┐
   │      Crowd Counter  Status        │
@@ -205,39 +267,46 @@ crowd> status
   │  Channel     : 8                     │
   │  Paused      : NO                    │
   │  CSV mode    : NO                    │
+  │  LED         : ON                    │
   └──────────────────────────────────┘
 
-crowd> vendors
+ESP32> vendors
   Device vendor breakdown:
     Phone : 9
     Laptop : 3
     IoT : 1
     Unknown : 1
 
-crowd> rssi -65
+ESP32> rssi -65
 [rssi] Threshold set to -65 dBm
 
-crowd> dump
+ESP32> dump
   MAC                 RSSI    Age(s)  Vendor
   ──────────────────  ──────  ──────  ──────────
   A4:83:E7:12:BC:01   -54 dBm   3s    Apple
   3C:22:FB:AA:11:22   -62 dBm   7s    Apple
   ...
   Total: 14
+
+ESP32> csv
+[csv] Output mode: CSV
+
+I (12345) reporter: timestamp_ms,count,peak,avg,rssi_thresh,channel,slots_used
+I (17456) reporter: 5000,14,23,12,-70,8,14
 ```
 
 ---
 
 ## Configuration Reference
 
-All constants are in `config.h`. No library edits needed.
+All constants are in `main/config.h`. Rebuild after changes.
 
 ### Scanning
 
 | Constant | Default | Description |
 |---|---|---|
-| `CHANNEL_MIN` | `1` | Lowest WiFi channel to scan |
-| `CHANNEL_MAX` | `13` | Highest WiFi channel to scan |
+| `CHANNEL_MIN` | `1` | Lowest WiFi channel |
+| `CHANNEL_MAX` | `13` | Highest WiFi channel |
 | `CHANNEL_HOP_MS` | `200` | Dwell time per channel (ms) |
 
 ### Signal Filter
@@ -252,38 +321,35 @@ All constants are in `config.h`. No library edits needed.
 
 | Constant | Default | Description |
 |---|---|---|
-| `MAC_EXPIRY_MS` | `300000` | Silent MAC eviction timeout (5 min) |
+| `MAC_EXPIRY_MS` | `300000` | Silent MAC eviction (5 min) |
 | `MAX_TRACKED_DEVICES` | `200` | Hard cap on unique MACs |
-| `HASH_TABLE_SIZE` | `211` | Hash table buckets (prime, ~1.1× max) |
+| `HASH_TABLE_SIZE` | `211` | Hash table buckets (prime) |
 
 ### Statistics
 
 | Constant | Default | Description |
 |---|---|---|
 | `AVG_WINDOW` | `6` | Rolling average sample count |
-| `REPORT_INTERVAL_MS` | `5000` | How often to print reports |
+| `REPORT_INTERVAL_MS` | `5000` | Report interval |
 
 ### Hardware
 
 | Constant | Default | Description |
 |---|---|---|
 | `LED_PIN` | `2` | GPIO for heartbeat LED (-1 to disable) |
-| `SERIAL_BAUD` | `115200` | Serial monitor baud rate |
 
-### Feature Toggles
+### Task Configuration
 
 | Constant | Default | Description |
 |---|---|---|
-| `ENABLE_SERIAL_CLI` | `1` | Interactive serial commands |
-| `ENABLE_CSV_LOGGING` | `1` | CSV output mode support |
-| `ENABLE_OUI_LOOKUP` | `1` | MAC vendor prefix matching |
-| `ENABLE_WEB_SERVER` | `0` | HTTP JSON API (see note below) |
-
-### Optional: Web Server
-
-When `ENABLE_WEB_SERVER = 1`, the ESP32 runs a lightweight HTTP server in APSTA mode alongside promiscuous mode. A JSON endpoint is available at `http://192.168.4.1/api/count`.
-
-> **Trade-off:** This may slightly reduce capture performance because the radio time-slices between AP and STA interfaces. Enable only if you need programmatic access to the count.
+| `TASK_STACK_SIZE_CHANNEL` | `4096` | Channel hopper stack |
+| `TASK_STACK_SIZE_REPORT` | `4096` | Reporter stack |
+| `TASK_STACK_SIZE_CLI` | `8192` | CLI REPL stack |
+| `TASK_STACK_SIZE_EXPIRE` | `4096` | Expiry task stack |
+| `TASK_PRIO_CHANNEL` | `5` | Channel hopper priority |
+| `TASK_PRIO_REPORT` | `3` | Reporter priority |
+| `TASK_PRIO_CLI` | `2` | CLI priority |
+| `TASK_PRIO_EXPIRE` | `3` | Expiry priority |
 
 ---
 
@@ -297,128 +363,62 @@ When `ENABLE_WEB_SERVER = 1`, the ESP32 runs a lightweight HTTP server in APSTA 
   Slots: 14/200
 ```
 
-| Field | Meaning |
-|---|---|
-| `00:05:32` | Uptime (HH:MM:SS) |
-| `Crowd: 14` | Current unique MACs |
-| `avg: 12` | Rolling average (last 6 reports) |
-| `peak: 23` | Highest count since boot |
-| `RSSI >= -70 dBm` | Active filter |
-| `ch: 8` | Current scan channel |
-| `Slots: 14/200` | Hash table capacity |
-
-### CSV Mode (`csv` command)
+### CSV Mode
 
 ```csv
 timestamp_ms,count,peak,avg,rssi_thresh,channel,slots_used
-332000,14,23,12,-70,8,14
-337000,16,23,13,-70,3,16
-```
-
-Pipe the serial output to a file for data collection:
-
-```bash
-# Linux / macOS
-python -m serial.tools.miniterm /dev/ttyUSB0 115200 | tee crowd_data.csv
-
-# Windows (PowerShell)
-python -m serial.tools.miniterm COM3 115200 | Out-File crowd_data.csv
+5000,14,23,12,-70,8,14
+10000,16,23,13,-70,3,16
 ```
 
 ---
 
 ## OUI Vendor Lookup
 
-The first 3 bytes of a MAC address identify the hardware manufacturer (OUI — Organisationally Unique Identifier). The built-in table categorises devices:
+The first 3 bytes of a MAC address identify the hardware manufacturer. The built-in table categorises devices:
 
-| Category | Vendors Included | Typical Devices |
+| Category | Vendors | Typical Devices |
 |---|---|---|
 | **Phone** | Apple, Samsung, Google | iPhones, Galaxy, Pixel |
-| **Laptop** | Intel, Realtek, Broadcom | Wi-Fi adapters in PCs |
+| **Laptop** | Intel, Realtek, Broadcom | Wi-Fi adapters |
 | **IoT** | Espressif, Tuya, Xiaomi | Smart home devices |
 | **Unknown** | Not in table | Everything else |
 
-Use the `vendors` CLI command to see a live breakdown:
+Use `vendors` in the CLI for a live breakdown.
 
-```
-crowd> vendors
-  Device vendor breakdown:
-    Phone : 9
-    Laptop : 3
-    IoT : 1
-    Unknown : 1
-```
+### Adding Entries
 
-### Adding Custom OUI Entries
-
-Edit `oui_lookup.cpp` and add entries to `g_ouiTable[]`:
-
-```cpp
-{ {0xAA, 0xBB, 0xCC}, "MyVendor", VENDOR_PHONE },
-```
-
-Then update `OUI_TABLE_SIZE` in `config.h`.
-
----
-
-## CSV Data Logging
-
-1. Set the serial CLI to CSV mode:
-   ```
-   crowd> csv
-   [csv] Output mode: CSV
-   ```
-
-2. The header line is printed immediately:
-   ```csv
-   timestamp_ms,count,peak,avg,rssi_thresh,channel,slots_used
-   ```
-
-3. Every 5 seconds, a new row is appended.
-
-4. Capture the serial output to a file (see example commands above).
-
-5. Open in Excel, Google Sheets, or any data analysis tool.
+Edit `main/oui_lookup.c`, append to `g_ouiTable[]`, and update `OUI_TABLE_SIZE` in `config.h`.
 
 ---
 
 ## 802.11 Header Parsing
 
-This is the most technical part of the code. Here's the byte-by-byte breakdown:
-
-### Raw Frame Structure
+### Frame Layout
 
 ```
-Byte:  0     1     2     3     4     5     6     7     8     9    10    11    12    13    14    15    16    17    18
-     ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐
-     │ FC0 │ FC1 │DurID│        Address 1 (Dest)       │       Address 2 (Source)       │      Address 3 (BSSID)     │
-     └─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘
-             ↑                                                           ↑
-          Frame                                                      Source MAC
-          Control                                                    (we extract this)
+Byte:  0     1     2     3     4     5     6     7     8     9    10    11    12    13    14    15    16    17
+     ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐
+     │ FC0 │ FC1 │DurID│       Address 1 (Dest)        │       Address 2 (Source)       │    Address 3     │
+     └─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘
+             ↑                                                         ↑
+          Frame                                                     Source MAC
+          Control                                                   (extract this)
 ```
 
-### Frame Control Byte 0 (FC0)
+### Code
 
+```c
+/* Subtype: byte 0, bits [7:4] */
+uint8_t subtype = (frame[0] >> 4) & 0x0F;
+if (subtype != 0x04) return;  /* not Probe Request */
+
+/* Source MAC at byte offset 10 */
+const uint8_t *srcMac = &frame[10];
+
+/* RSSI from driver metadata (NOT in the frame) */
+int8_t rssi = pkt->rx_ctrl.rssi;
 ```
-Bit:    7     6     5     4     3     2     1     0
-     ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐
-     │  Subtype (4 bits)  │ Type │ Proto│ Proto│     │
-     │  └── 0x04 = Probe  │(2bit)│ ver  │ ver  │     │
-     └────────────────────┴──────┴──────┴──────┴─────┘
-              bits[7:4]      bits[3:2]   bits[1:0]
-```
-
-**Code:**
-```cpp
-uint8_t subtype = (frame[0] >> 4) & 0x0F;  // → 0x04 for Probe Request
-const uint8_t *srcMac = &frame[10];          // Address 2 at offset 10
-int8_t rssi = pkt->rx_ctrl.rssi;             // from driver metadata
-```
-
-### Why RSSI Is Not in the Frame
-
-The RSSI (Received Signal Strength Indicator) is a measurement made by the radio hardware. It is attached to the frame by the ESP32 driver in a separate metadata struct (`wifi_promiscuous_pkt_t.rx_ctrl`). It is never part of the 802.11 frame itself.
 
 ---
 
@@ -429,10 +429,10 @@ The RSSI (Received Signal Strength Indicator) is a measurement made by the radio
   │                 ESP32 Wi-Fi Radio                    │
   │              (Promiscuous Mode)                      │
   └──────────────────────┬──────────────────────────────┘
-                         │ raw 802.11 frame + metadata
+                         │ 802.11 frame + rx_ctrl metadata
                          ▼
   ┌──────────────────────────────────────────────────────┐
-  │          sniffer.cpp — snifferCallback() [ISR]       │
+  │         sniffer.c — snifferCallback() [ISR]          │
   │                                                      │
   │  1. type == WIFI_PKT_MGMT ?                          │
   │  2. subtype == 0x04 ?  (Probe Request)               │
@@ -443,60 +443,38 @@ The RSSI (Received Signal Strength Indicator) is a measurement made by the radio
                          │
                          ▼
   ┌──────────────────────────────────────────────────────┐
-  │       hash_table.cpp — g_table[211] (fixed)          │
+  │      hash_table.c — g_table[211] (fixed, ISR-safe)   │
   │                                                      │
   │  ┌────────┬─────────┬────────────┬──────────┐        │
   │  │ mac[6] │ rssi    │ lastSeenMs │ occupied │        │
   │  └────────┴─────────┴────────────┴──────────┘        │
   └──────────────────────┬──────────────────────────────┘
                          │
+          ┌──────────────┼──────────────┐
+          ▼              ▼              ▼
+  ┌──────────────┐ ┌──────────┐ ┌──────────────┐
+  │ channelTask  │ │expireTask│ │ reportTask   │
+  │ (hop ch 1–13)│ │(evict    │ │ (print stats │
+  │              │ │ stale)   │ │  every 5s)   │
+  └──────────────┘ └──────────┘ └──────────────┘
+                         │
                          ▼
-  ┌──────────────────────────────────────────────────────┐
-  │               passive-wifi-crowd-counter.ino          │
-  │                        loop()                         │
-  │                                                      │
-  │  channelManagerHop()  → rotate ch 1–13               │
-  │  expireTick()         → evict stale MACs             │
-  │  reportTick()         → build stats, print output    │
-  │  cliPoll()            → process serial commands      │
-  │  cliLedHeartbeat()    → 1 Hz LED blink              │
-  └──────────────────────────────────────────────────────┘
+                 ┌──────────────┐
+                 │   cliTask    │
+                 │ (esp_console │
+                 │  REPL on UART)│
+                 └──────────────┘
 ```
 
----
+### FreeRTOS Task Layout
 
-## Optimisation Notes
-
-### v1 → v2 → v3 Improvements
-
-| Area | v1 | v2 | v3 |
+| Task | Priority | Stack | Function |
 |---|---|---|---|
-| **Architecture** | Single file | Single file | **10 modular files** |
-| **MAC storage** | `std::map<string>` | Fixed hash table | Fixed hash table |
-| **ISR allocations** | Heap (dangerous) | Zero | Zero |
-| **CLI** | None | None | **Interactive 15-command CLI** |
-| **Vendor lookup** | None | None | **OUI prefix matching** |
-| **CSV output** | None | None | **Toggle-able CSV mode** |
-| **Stats** | Raw count | Rolling avg + peak | Rolling avg + peak + channels |
-| **Config** | In-code defines | In-code defines | **Dedicated config.h** |
-| **Runtime tuning** | Reboot required | Reboot required | **CLI: rssi, expiry, reset** |
-
-### Why a Hash Table Instead of `std::map`?
-
-The sniffer callback runs in **ISR context**:
-
-- **Heap allocation is forbidden** (causes crashes or fragmentation)
-- **CPU time is precious** (blocks other interrupts)
-- `std::map::operator[]` may allocate → **deadly in ISR**
-- `std::string` allocates heap → **deadly in ISR**
-
-The fixed hash table (open-addressing, FNV-1a) needs zero dynamic allocation and completes in O(1) amortised time.
-
-### IRAM_ATTR
-
-Places the callback in Instruction RAM instead of Flash. Critical because:
-- Flash reads during interrupts can crash (shared with cache)
-- IRAM is always accessible → deterministic timing
+| `channelTask` | 5 (highest) | 4 KB | Hops WiFi channels every 200 ms |
+| `expireTask` | 3 | 4 KB | Evicts stale MACs every 1 s |
+| `reportTask` | 3 | 4 KB | Prints crowd stats every 5 s |
+| `cliTask` | 2 (lowest) | 8 KB | Runs `esp_console` REPL |
+| `ledTask` | 1 | 2 KB | 1 Hz heartbeat LED blink |
 
 ---
 
@@ -504,31 +482,25 @@ Places the callback in Instruction RAM instead of Flash. Critical because:
 
 ### Small Conference Room (10–30 people)
 
-```cpp
+```c
 #define RSSI_THRESHOLD_DEFAULT  (-65)
 #define MAC_EXPIRY_MS           180000UL
 #define MAX_TRACKED_DEVICES     50
-#define CHANNEL_HOP_MS          150
 ```
 
-Or at runtime:
-```
-crowd> rssi -65
-crowd> expiry 180
-```
+Or at runtime: `rssi -65` then `expiry 180`
 
 ### Large Lecture Hall (50–200 people)
 
-```cpp
+```c
 #define RSSI_THRESHOLD_DEFAULT  (-75)
 #define MAC_EXPIRY_MS           300000UL
 #define MAX_TRACKED_DEVICES     200
-#define CHANNEL_HOP_MS          250
 ```
 
-### Building Entrance (pass-through counting)
+### Building Entrance
 
-```cpp
+```c
 #define RSSI_THRESHOLD_DEFAULT  (-55)
 #define MAC_EXPIRY_MS           60000UL
 #define MAX_TRACKED_DEVICES     100
@@ -538,46 +510,44 @@ crowd> expiry 180
 
 | Problem | Solution |
 |---|---|
-| Count too high | Raise threshold: `crowd> rssi -60` |
-| Count too low | Lower threshold: `crowd> rssi -80` |
+| Count too high | `rssi -60` |
+| Count too low | `rssi -80` or add external antenna |
 | Count fluctuates | Increase `AVG_WINDOW` in config.h |
 | RAM crashes | Lower `MAX_TRACKED_DEVICES` |
-| No captures | Add external antenna, lower threshold |
 
 ---
 
 ## Troubleshooting
 
-### "Count is always 0"
+### Build fails
 
-1. Check board variant — must be ESP32 (not S2/S3/C3 in某些 modes).
-2. Check antenna — WROOM-32U needs external antenna on U.FL.
-3. Try `crowd> rssi -80` to lower the threshold.
-4. Verify baud rate is 115200.
+1. Ensure ESP-IDF v5.1+ is installed and sourced (`. $IDF_PATH/export.sh`)
+2. Run `idf.py set-target esp32` before building
+3. Try `idf.py fullclean && idf.py build`
 
-### "Count is unrealistically high"
+### Flash fails
 
-1. Raise threshold: `crowd> rssi -60`.
-2. Lower expiry: `crowd> expiry 120`.
-3. MAC randomisation — modern phones randomise MACs; one person → multiple MACs.
+1. Hold **BOOT** button while idf.py says "Connecting..."
+2. Check port: `ls /dev/ttyUSB*` (Linux) or Device Manager (Windows)
+3. Try lower speed: `idf.py -p /dev/ttyUSB0 -b 115200 flash`
 
-### "Serial output is garbled"
+### Count is always 0
 
-1. Baud rate must be **115200** in Serial Monitor.
-2. Press **RST** on the ESP32 after opening Serial Monitor.
-3. Check `SERIAL_BAUD` matches.
+1. Check antenna — WROOM-32U needs external antenna on U.FL
+2. Try `rssi -80` to lower the threshold
+3. Ensure you're using ESP32 (not S2/S3/C3)
 
-### "Board crashes or hangs"
+### Count is unrealistically high
 
-1. Lower `MAX_TRACKED_DEVICES` — each slot is 12 bytes.
-2. Keep `CHANNEL_HOP_MS` ≥ 100.
-3. Try `crowd> reset` to clear the table.
+1. Raise threshold: `rssi -60`
+2. Lower expiry: `expiry 120`
+3. MAC randomisation — one person may appear as multiple MACs
 
-### Upload Fails
+### Board crashes
 
-1. Hold **BOOT** button while IDE says "Connecting...".
-2. Try a different USB cable (some are power-only).
-3. Reduce upload speed to `115200`.
+1. Lower `MAX_TRACKED_DEVICES`
+2. Keep `CHANNEL_HOP_MS` ≥ 100
+3. `reset` to clear the table
 
 ---
 
@@ -591,7 +561,7 @@ crowd> expiry 180
 - Does **not** store or transmit data externally
 - All data is lost on power-off
 
-### What This Device Does NOT Do
+### What It Does NOT Do
 
 - Does **not** identify individuals
 - Does **not** track location over time
@@ -600,22 +570,9 @@ crowd> expiry 180
 
 ### Important Notes
 
-- **MAC randomisation**: iOS 14+ and Android 10+ randomise Wi-Fi MACs. The counter measures *device appearances*, not *people*.
-- **Consent**: Passive radio monitoring may be subject to surveillance laws in some jurisdictions.
-- **Best use**: Relative occupancy estimator (trend), not an exact headcount.
-
----
-
-## Limitations
-
-| Limitation | Impact | Mitigation |
-|---|---|---|
-| MAC randomisation | 1 person → multiple MACs | Use as relative trend |
-| Wi-Fi off | Device invisible | Cannot solve passively |
-| Environment variance | Walls/furniture attenuate signal | Tune RSSI, use external antenna |
-| Single antenna | No direction finding | Deploy multiple units |
-| 2.4 GHz only | 5 GHz devices not scanned | ESP32 limitation |
-| No persistent storage | Count resets on reboot | Add SD logging (not included) |
+- **MAC randomisation**: iOS 14+ and Android 10+ randomise MACs. One person → multiple MACs.
+- **Consent**: Check local regulations before deployment.
+- **Best use**: Relative occupancy estimator, not exact headcount.
 
 ---
 
@@ -627,6 +584,6 @@ MIT License. See [LICENSE](LICENSE).
 
 ## Credits
 
-- Espressif ESP32 Arduino Core: [github.com/espressif/arduino-esp32](https://github.com/espressif/arduino-esp32)
-- IEEE 802.11-2020 specification
-- Inspired by: [SpacehuhnTech/esp8266_deauther](https://github.com/SpacehuhnTech/esp8266_deauther), [schneems/SwarmSC](https://github.com/schneems/SwarmSC)
+- Espressif ESP-IDF: [github.com/espressif/esp-idf](https://github.com/espressif/esp-idf)
+- IEEE 802.11-2020
+- Inspired by: [SpacehuhnTech/esp8266_deauther](https://github.com/SpacehuhnTech/esp8266_deauther)

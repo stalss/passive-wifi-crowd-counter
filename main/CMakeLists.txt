@@ -1,0 +1,20 @@
+idf_component_register(
+    SRCS
+        "app_main.c"
+        "hash_table.c"
+        "sniffer.c"
+        "channel_manager.c"
+        "stats.c"
+        "serial_cli.c"
+        "reporter.c"
+        "oui_lookup.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        esp_wifi
+        esp_netif
+        esp_timer
+        nvs_flash
+        driver
+        console
+)
