@@ -1,6 +1,20 @@
-# Passive WiFi Crowd Counter — ESP32
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-3.1-blue" alt="Version"/>
+  <img src="https://img.shields.io/badge/ESP--IDF-v5.1+-red?logo=espressif" alt="ESP-IDF"/>
+  <img src="https://img.shields.io/badge/Language-C-white" alt="C"/>
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="License"/>
+  <img src="https://img.shields.io/badge/Tests-21%2F21-brightgreen" alt="Tests"/>
+  <img src="https://img.shields.io/github/stars/stalss/passive-wifi-crowd-counter?style=social" alt="Stars"/>
+</p>
 
-A **zero-cost, privacy-respecting** people counter that estimates room occupancy by passively sniffing Wi-Fi probe requests. No cameras, no beacons, no cloud — just a $3 ESP32 board and radio physics.
+<h1 align="center">Passive WiFi Crowd Counter</h1>
+
+<p align="center">
+  <strong>Zero-cost, privacy-respecting people counter.</strong><br/>
+  ESP32 sniffs WiFi probe requests — no cameras, no beacons, no cloud.
+</p>
+
+---
 
 > **v3.1** — ESP-IDF CMake build, pure C, modular architecture, serial CLI, OUI vendor lookup, CSV logging. ISR-safe concurrency, fixed channel reporting.
 
@@ -27,28 +41,38 @@ A **zero-cost, privacy-respecting** people counter that estimates room occupancy
 
 ---
 
+## What It Does
+
+| Feature | Description |
+|---------|-------------|
+| **Passive sniffing** | Captures WiFi probe requests — no network connection needed |
+| **MAC deduplication** | ISR-safe hash table tracks unique devices |
+| **Vendor lookup** | Identifies Phone / Laptop / IoT by OUI prefix |
+| **Serial CLI** | 15 interactive commands with tab completion |
+| **CSV logging** | Machine-readable output for data pipelines |
+| **Rolling stats** | Smoothed count, peak tracking, per-channel hits |
+
+---
+
 ## Quick Start
 
 ```bash
-# Clone the repo
 git clone https://github.com/stalss/passive-wifi-crowd-counter.git
 cd passive-wifi-crowd-counter
 
-# Set up ESP-IDF environment (see Prerequisites)
+# Set up ESP-IDF environment
 . $IDF_PATH/export.sh
 
-# Build, flash, and monitor
+# Build, flash, monitor
 idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor
 ```
 
-Type `help` in the monitor for a list of commands.
+Type `help` in the monitor for commands.
 
 ---
 
-## Prerequisites
-
-### ESP-IDF v5.1+
+## How It Works
 
 This project uses the **ESP-IDF** build system (CMake). It does **not** use the Arduino framework.
 
@@ -548,6 +572,24 @@ Or at runtime: `rssi -65` then `expiry 180`
 1. Lower `MAX_TRACKED_DEVICES`
 2. Keep `CHANNEL_HOP_MS` ≥ 100
 3. `reset` to clear the table
+
+---
+
+## Native Testing (No ESP-IDF Needed)
+
+Run the test suite on Linux without hardware:
+
+```bash
+cd test
+make test
+```
+
+**21 tests covering:**
+- Hash table: init, insert, dedup, capacity, expiry, reset
+- Channel manager: init, hop, off-by-one verification
+- Stats: rolling average, peak tracking, reset
+- Reporter: CSV mode toggle
+- Integration: full init → insert → stats → report cycle
 
 ---
 
