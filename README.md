@@ -2,7 +2,7 @@
 
 A **zero-cost, privacy-respecting** people counter that estimates room occupancy by passively sniffing Wi-Fi probe requests. No cameras, no beacons, no cloud — just a $3 ESP32 board and radio physics.
 
-> **v3.0** — ESP-IDF CMake build, pure C, modular architecture, serial CLI, OUI vendor lookup, CSV logging.
+> **v3.1** — ESP-IDF CMake build, pure C, modular architecture, serial CLI, OUI vendor lookup, CSV logging. ISR-safe concurrency, fixed channel reporting.
 
 ---
 
