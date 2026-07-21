@@ -21,6 +21,5 @@ typedef struct {
 } OuiEntry;
 
 const OuiEntry *ouiLookup(const uint8_t *mac);
-const char     *ouiTypeName(VendorType type);
 
 #endif /* OUI_LOOKUP_H */

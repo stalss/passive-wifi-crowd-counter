@@ -30,15 +30,6 @@ extern unsigned long g_macExpiryMs;
 /* ── LED state ───────────────────────────────────────────────── */
 static int g_ledEnabled = 1;
 
-/* ── Helper: format uptime ───────────────────────────────────── */
-static void fmtUptime(unsigned long ms, char *buf, int len) {
-    unsigned long sec  = ms / 1000;
-    unsigned long mins = sec / 60;
-    unsigned long hrs  = mins / 60;
-    snprintf(buf, len, "%02lu:%02lu:%02lu",
-             hrs, mins % 60, sec % 60);
-}
-
 /* ── Helper: trim whitespace ─────────────────────────────────── */
 static char *trim(char *s) {
     while (*s == ' ' || *s == '\t') s++;
@@ -358,15 +349,6 @@ void cliInit(void) {
     esp_console_cmd_register(&cmd);
 
     ESP_LOGI(TAG, "CLI initialised — type 'help' for commands");
-}
-
-/* ================================================================
- *  CLI poll — called from the REPL task
- *  (esp_console handles UART I/O and line editing)
- * ================================================================ */
-
-void cliPoll(void) {
-    /* esp_console REPL runs its own loop; nothing needed here */
 }
 
 /* ================================================================

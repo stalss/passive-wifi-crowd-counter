@@ -10,6 +10,14 @@
 static DeviceSlot g_table[HASH_TABLE_SIZE];
 static volatile uint16_t g_count = 0;
 
+/* ── Critical section for ISR/task synchronization ─────────────── */
+
+#include "freertos/FreeRTOS.h"
+#include "freertos/portmacro.h"
+
+#define ENTER_CRITICAL()  portENTER_CRITICAL_ISR(NULL)
+#define EXIT_CRITICAL()   portEXIT_CRITICAL_ISR(NULL)
+
 /* ── FNV-1a hash ────────────────────────────────────────────────── */
 
 static inline uint32_t fnv1a(const uint8_t *mac) {
@@ -59,7 +67,9 @@ int hashTableUpsert(const uint8_t *mac, int8_t rssi) {
                 g_table[pos].rssi       = rssi;
                 g_table[pos].lastSeenMs = now;
                 g_table[pos].occupied   = 1;
+                ENTER_CRITICAL();
                 g_count++;
+                EXIT_CRITICAL();
                 return 1; /* new device */
             }
             return 0; /* table full */
@@ -74,7 +84,9 @@ void hashTableExpire(unsigned long now, unsigned long expiryMs) {
             (now - g_table[i].lastSeenMs > expiryMs))
         {
             g_table[i].occupied = 0;
+            ENTER_CRITICAL();
             g_count--;
+            EXIT_CRITICAL();
         }
     }
 }

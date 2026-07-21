@@ -28,10 +28,10 @@ void channelManagerHop(void) {
     if (millis() - g_lastHopMs < CHANNEL_HOP_MS) return;
     g_lastHopMs = millis();
 
-    esp_wifi_set_channel(g_channel, WIFI_SECOND_CHAN_NONE);
-
     g_channel++;
     if (g_channel > CHANNEL_MAX) g_channel = CHANNEL_MIN;
+
+    esp_wifi_set_channel(g_channel, WIFI_SECOND_CHAN_NONE);
 }
 
 uint8_t channelManagerCurrent(void) {

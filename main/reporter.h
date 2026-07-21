@@ -4,7 +4,6 @@
 #include "types.h"
 
 void reporterInit(void);
-void reporterBanner(void);
 int  reporterPrint(const CrowdStats *stats);
 void reporterSetCsvMode(int enabled);
 int  reporterIsCsvMode(void);

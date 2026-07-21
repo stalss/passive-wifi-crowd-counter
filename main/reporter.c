@@ -20,14 +20,6 @@ void reporterCsvHeader(void) {
     printf("timestamp_ms,count,peak,avg,rssi_thresh,channel,slots_used\r\n");
 }
 
-static void fmtUptime(unsigned long ms, char *buf, int len) {
-    unsigned long sec  = ms / 1000;
-    unsigned long mins = sec / 60;
-    unsigned long hrs  = mins / 60;
-    snprintf(buf, len, "%02lu:%02lu:%02lu",
-             hrs, mins % 60, sec % 60);
-}
-
 static void printHuman(const CrowdStats *s) {
     char uptime[12];
     fmtUptime(s->uptimeMs, uptime, sizeof(uptime));

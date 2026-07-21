@@ -39,12 +39,3 @@ const OuiEntry *ouiLookup(const uint8_t *mac) {
     }
     return (void *)0;
 }
-
-const char *ouiTypeName(VendorType type) {
-    switch (type) {
-        case VENDOR_PHONE:  return "Phone";
-        case VENDOR_LAPTOP: return "Laptop";
-        case VENDOR_IOT:    return "IoT";
-        default:            return "Unknown";
-    }
-}

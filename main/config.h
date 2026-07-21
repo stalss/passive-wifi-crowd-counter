@@ -16,6 +16,16 @@ static inline uint32_t millis(void) {
     return (uint32_t)(esp_timer_get_time() / 1000);
 }
 
+/* ── fmtUptime() helper ─────────────────────────────────────────── */
+
+static inline void fmtUptime(unsigned long ms, char *buf, int len) {
+    unsigned long sec  = ms / 1000;
+    unsigned long mins = sec / 60;
+    unsigned long hrs  = mins / 60;
+    snprintf(buf, len, "%02lu:%02lu:%02lu",
+             hrs, mins % 60, sec % 60);
+}
+
 /* ── Wi-Fi Scanning ─────────────────────────────────────────────── */
 
 #define CHANNEL_MIN              1
@@ -45,12 +55,7 @@ static inline uint32_t millis(void) {
 
 /* ── Serial CLI ─────────────────────────────────────────────────── */
 
-#define ENABLE_SERIAL_CLI        1
 #define CLI_BUFFER_SIZE          64
-
-/* ── CSV Logging ────────────────────────────────────────────────── */
-
-#define ENABLE_CSV_LOGGING       1
 
 /* ── OUI Vendor Lookup ──────────────────────────────────────────── */
 
